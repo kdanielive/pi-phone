@@ -1,0 +1,42 @@
+{
+  "name": "@malinamnam/pi-phone",
+  "version": "0.0.1",
+  "description": "Phone-first remote UI extension for Pi with Tailscale-friendly access",
+  "type": "module",
+  "homepage": "https://github.com/MaliNamNam/pi-phone#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MaliNamNam/pi-phone.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MaliNamNam/pi-phone/issues"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "extension",
+    "phone",
+    "mobile",
+    "tailscale"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "index.ts",
+    "phone-session-pool.ts",
+    "public",
+    "README.md"
+  ],
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1"
+  }
+}
