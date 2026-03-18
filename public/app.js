@@ -65,6 +65,7 @@ const el = {
   banner: document.querySelector('#banner'),
   commandStrip: document.querySelector('#command-strip'),
   composerActions: document.querySelector('.composer-actions'),
+  composerWrap: document.querySelector('.composer-wrap'),
   connectionPill: document.querySelector('#connection-pill'),
   cwdValue: document.querySelector('#cwd-value'),
   imageInput: document.querySelector('#image-input'),
@@ -104,6 +105,8 @@ const el = {
   widgetStack: document.querySelector('#widget-stack'),
 };
 
+let composerLayoutFrame = 0;
+
 function storeToken(token) {
   if (token) localStorage.setItem(TOKEN_STORAGE_KEY, token);
   else localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -136,6 +139,22 @@ function escapeHtml(text = '') {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
+}
+
+function formatCwdDisplay(path = '') {
+  const value = String(path || '').trim();
+  if (!value) return '';
+
+  const homeMatch = value.match(/^\/(?:home|Users)\/[^/]+(\/.*)?$/);
+  if (homeMatch) {
+    return homeMatch[1] ? `~${homeMatch[1]}` : '~';
+  }
+
+  if (value === '/') return value;
+
+  const parts = value.split('/').filter(Boolean);
+  if (parts.length <= 3) return value;
+  return `/${parts[0]}/…/${parts.slice(-2).join('/')}`;
 }
 
 function formatTimestamp(timestamp) {
@@ -1146,10 +1165,25 @@ function isAnyModalOpen() {
   return !el.sheetModal.classList.contains('hidden') || !el.uiModal.classList.contains('hidden') || !el.loginModal.classList.contains('hidden');
 }
 
+function syncComposerReserve() {
+  if (!el.composerWrap) return;
+  const reserve = Math.max(144, Math.ceil(el.composerWrap.getBoundingClientRect().height + 16));
+  document.documentElement.style.setProperty('--composer-reserve', `${reserve}px`);
+}
+
+function scheduleComposerLayoutSync() {
+  if (composerLayoutFrame) return;
+  composerLayoutFrame = requestAnimationFrame(() => {
+    composerLayoutFrame = 0;
+    syncComposerReserve();
+  });
+}
+
 function scrollMessagesToBottom() {
   if (isAnyModalOpen()) return;
   requestAnimationFrame(() => {
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    syncComposerReserve();
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
   });
 }
 
@@ -1243,12 +1277,14 @@ function quotaPillClassName(leftPercent) {
 function renderQuota() {
   const cwd = state.status?.cwd || state.health?.cwd || '';
   if (cwd) {
-    el.quotaCwd.textContent = `cwd: ${cwd}`;
+    el.quotaCwd.textContent = formatCwdDisplay(cwd);
     el.quotaCwd.title = cwd;
+    el.quotaCwd.setAttribute('aria-label', `Working directory ${cwd}`);
     el.quotaCwd.className = 'quota-pill cwd-pill mono';
   } else {
     el.quotaCwd.textContent = '';
     el.quotaCwd.title = '';
+    el.quotaCwd.removeAttribute('aria-label');
     el.quotaCwd.className = 'quota-pill cwd-pill mono hidden';
   }
 
@@ -1263,6 +1299,7 @@ function renderQuota() {
     el.quotaPrimary.className = 'quota-pill hidden';
     el.quotaSecondary.className = 'quota-pill hidden';
     el.quotaRow.classList.toggle('hidden', !cwd);
+    scheduleComposerLayoutSync();
     return;
   }
 
@@ -1278,6 +1315,7 @@ function renderQuota() {
     el.quotaPrimary.className = 'quota-pill hidden';
     el.quotaSecondary.className = 'quota-pill hidden';
     el.quotaRow.classList.toggle('hidden', !cwd);
+    scheduleComposerLayoutSync();
     return;
   }
 
@@ -1308,6 +1346,7 @@ function renderQuota() {
   }
 
   el.quotaRow.classList.remove('hidden');
+  scheduleComposerLayoutSync();
 }
 
 async function refreshQuota({ force = false } = {}) {
@@ -1355,6 +1394,7 @@ function updateComposerState() {
   el.sendButton.setAttribute('aria-label', sendLabel);
   el.sendButton.setAttribute('title', sendLabel);
   el.steerButton.classList.toggle('hidden', !streaming);
+  scheduleComposerLayoutSync();
 }
 
 function renderHeader() {
@@ -1380,6 +1420,7 @@ function renderHeader() {
 function autoResizeTextarea() {
   el.promptInput.style.height = 'auto';
   el.promptInput.style.height = `${Math.min(el.promptInput.scrollHeight, 220)}px`;
+  scheduleComposerLayoutSync();
 }
 
 function openTokenModal() {
@@ -1643,6 +1684,7 @@ function clearAutocompleteSuggestions() {
   state.autocompleteItems = [];
   el.commandStrip.classList.add('hidden');
   el.commandStrip.innerHTML = '';
+  scheduleComposerLayoutSync();
 }
 
 function renderAutocompleteItems(items = []) {
@@ -1651,6 +1693,7 @@ function renderAutocompleteItems(items = []) {
   if (!items.length) {
     el.commandStrip.classList.add('hidden');
     el.commandStrip.innerHTML = '';
+    scheduleComposerLayoutSync();
     return;
   }
 
@@ -1661,6 +1704,7 @@ function renderAutocompleteItems(items = []) {
     </button>
   `).join('');
   el.commandStrip.classList.remove('hidden');
+  scheduleComposerLayoutSync();
 }
 
 function requestPathSuggestions(context) {
@@ -1857,6 +1901,7 @@ function renderAttachmentStrip() {
   if (!state.attachments.length) {
     el.attachmentStrip.classList.add('hidden');
     el.attachmentStrip.innerHTML = '';
+    scheduleComposerLayoutSync();
     return;
   }
 
@@ -1871,6 +1916,7 @@ function renderAttachmentStrip() {
     </article>
   `).join('');
   el.attachmentStrip.classList.remove('hidden');
+  scheduleComposerLayoutSync();
 }
 
 function addAttachments(files) {
@@ -2996,6 +3042,15 @@ el.promptInput.addEventListener('keyup', (event) => {
 autoResizeTextarea();
 renderCommandSuggestions();
 renderAttachmentStrip();
+scheduleComposerLayoutSync();
+
+if ('ResizeObserver' in window && el.composerWrap) {
+  const composerResizeObserver = new ResizeObserver(() => scheduleComposerLayoutSync());
+  composerResizeObserver.observe(el.composerWrap);
+}
+
+window.addEventListener('resize', scheduleComposerLayoutSync, { passive: true });
+window.visualViewport?.addEventListener('resize', scheduleComposerLayoutSync, { passive: true });
 
 el.refreshButton.addEventListener('click', refreshAll);
 el.abortButton.addEventListener('click', () => sendRpc({ type: 'abort' }));
