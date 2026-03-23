@@ -74,13 +74,6 @@ export function initializeBindings({ handleEnvelope, handleAuthFailure }) {
     renderCommandSuggestions();
   });
 
-  el.promptInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      submitPrompt();
-    }
-  });
-
   el.commandStrip.addEventListener("click", (event) => {
     const button = event.target.closest("[data-autocomplete-index]");
     if (!button) return;
