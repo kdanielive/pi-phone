@@ -44,7 +44,7 @@ type SlashCommandMatch = {
   source: string;
 };
 
-const DEFAULT_IDLE_TIMEOUT_MS = 2 * 60 * 60_000;
+const DEFAULT_IDLE_TIMEOUT_MS = 0;
 
 function isAddressInUseError(error: unknown) {
   const err = error as NodeJS.ErrnoException | null;
